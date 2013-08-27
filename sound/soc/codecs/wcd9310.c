@@ -8463,7 +8463,8 @@ EXPORT_SYMBOL(wcd9xxx_hw_revision);
 void update_headphones_volume_boost(int vol_boost)
 {
 	unsigned int default_val = soundcontrol.default_headphones_val;
-	unsigned int boosted_val = default_val + vol_boost;
+	unsigned int boosted_val = vol_boost != 0 ? 
+									default_val + vol_boost : default_val;
 
 	pr_info("Sound Control: Headphones default value %d\n", default_val);
 	
@@ -8483,7 +8484,8 @@ void update_headphones_volume_boost(int vol_boost)
 void update_headset_volume_boost(int vol_boost)
 {
 	unsigned int default_val = soundcontrol.default_headset_val;
-	unsigned int boosted_val = default_val + vol_boost;
+	unsigned int boosted_val = vol_boost != 0 ? 
+									default_val + vol_boost : default_val;
 
 	pr_info("Sound Control: Headset default value %d\n", default_val);
 	
