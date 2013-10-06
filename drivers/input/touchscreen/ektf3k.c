@@ -30,6 +30,7 @@
 #include <linux/cpufreq.h>
 #include <linux/hotplug.h>
 #include <linux/cpu.h>
+#include <linux/syscalls.h>
 
 // for linux 2.6.36.3
 #include <linux/cdev.h>
@@ -984,6 +985,30 @@ static void elan_ktf3k_ts_report_data(struct i2c_client *client, uint8_t *buf)
 	return;
 }
 
+#define BOOSTPULSE "/sys/devices/system/cpu/cpufreq/interactive/boostpulse"
+
+struct boost_flo {
+	int boostpulse_fd;
+};
+
+static struct boost_flo boost;
+
+static int boostpulse_open(void)
+{
+	if (boost.boostpulse_fd < 0)
+	{
+		boost.boostpulse_fd = sys_open(BOOSTPULSE, O_WRONLY, 0);
+		
+		if (boost.boostpulse_fd < 0)
+		{
+			pr_info("Error opening %s\n", BOOSTPULSE);
+			return -1;		
+		}
+	}
+
+	return boost.boostpulse_fd;
+}
+
 static void elan_ktf3k_ts_report_data2(struct i2c_client *client, uint8_t *buf)
 {
 	struct elan_ktf3k_ts_data *ts = i2c_get_clientdata(client);
@@ -1071,6 +1096,7 @@ static void process_resp_message(struct elan_ktf3k_ts_data *ts, const unsigned c
 static void elan_ktf3k_ts_work_func(struct work_struct *work)
 {
 	int rc;
+	int len;
 	struct elan_ktf3k_ts_data *ts =
 		container_of(work, struct elan_ktf3k_ts_data, work);
 	uint8_t buf[NEW_PACKET_SIZE + 4] = { 0 };
@@ -1079,8 +1105,15 @@ static void elan_ktf3k_ts_work_func(struct work_struct *work)
 
 	if (interactive_selected)
 	{
-		is_touching = true;
-		freq_boosted_time = ktime_to_ms(ktime_get());
+		if (boostpulse_open() >= 0)
+		{
+			len = sys_write(boost.boostpulse_fd, "1", sizeof(BOOSTPULSE));
+			
+			if (len < 0)
+			{
+				pr_info("Error writing to %s\n", BOOSTPULSE);			
+			}
+		}
 	}
 
 	if(work_lock!=0) {
@@ -1501,6 +1534,8 @@ static int elan_ktf3k_ts_probe(struct i2c_client *client,
 	int err = 0;
 	struct elan_ktf3k_i2c_platform_data *pdata;
 	struct elan_ktf3k_ts_data *ts;
+
+	boost.boostpulse_fd = -1;
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		touch_debug(DEBUG_ERROR, "[elan] %s: i2c check functionality error\n", __func__);
