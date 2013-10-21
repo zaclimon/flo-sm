@@ -41,4 +41,5 @@ extern unsigned int report_load_at_max_freq(int cpu);
 
 extern bool interactive_selected;
 
+extern unsigned long gpu_pref_counter;
 #endif
