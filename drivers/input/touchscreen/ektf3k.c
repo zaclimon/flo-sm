@@ -95,7 +95,6 @@
 
 /* extern vars */
 bool is_touching;
-u64 freq_boosted_time;
 
 //don't use firmware update
 #define FIRMWARE_UPDATE_WITH_HEADER 1 
@@ -169,7 +168,7 @@ struct elan_ktf3k_ts_data {
 	struct wake_lock wakelock;
 #ifdef TOUCH_STRESS_TEST
       struct miscdevice  misc_dev;
-#endif 
+#endif
 };
 
 static struct elan_ktf3k_ts_data *private_ts = NULL;
@@ -196,7 +195,7 @@ static int mTouchStatus[FINGER_NUM] = {0};
 #define DEBUG_MESSAGES 5
 #define DEBUG_TRACE   10
 
-static int debug = DEBUG_INFO;
+static int debug = 0;
 
 #define touch_debug(level, ...) \
 	do { \
@@ -987,11 +986,11 @@ static void elan_ktf3k_ts_report_data(struct i2c_client *client, uint8_t *buf)
 
 #define BOOSTPULSE "/sys/devices/system/cpu/cpufreq/interactive/boostpulse"
 
-struct boost_flo {
+static struct boost_flo {
 	int boostpulse_fd;
+} boost = {
+	.boostpulse_fd = -1,
 };
-
-static struct boost_flo boost;
 
 static int boostpulse_open(void)
 {
@@ -1115,6 +1114,8 @@ static void elan_ktf3k_ts_work_func(struct work_struct *work)
 			}
 		}
 	}
+
+	is_touching = 1;
 
 	if(work_lock!=0) {
 		touch_debug(DEBUG_INFO, "Firmware update during touch event handling");
@@ -1535,8 +1536,6 @@ static int elan_ktf3k_ts_probe(struct i2c_client *client,
 	struct elan_ktf3k_i2c_platform_data *pdata;
 	struct elan_ktf3k_ts_data *ts;
 
-	boost.boostpulse_fd = -1;
-
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		touch_debug(DEBUG_ERROR, "[elan] %s: i2c check functionality error\n", __func__);
 		err = -ENODEV;
@@ -1696,6 +1695,7 @@ static int elan_ktf3k_ts_probe(struct i2c_client *client,
     touch_debug(DEBUG_INFO, "[ELAN]misc_register finished!!");	
 
   update_power_source();
+
   return 0;
 
 err_input_register_device_failed:
