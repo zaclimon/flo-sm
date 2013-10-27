@@ -67,7 +67,7 @@ static struct mutex gov_lock;
 static unsigned int hispeed_freq = 1242000;
 
 /* Go to hi speed when CPU load at or above this value. */
-#define DEFAULT_GO_HISPEED_LOAD 99
+#define DEFAULT_GO_HISPEED_LOAD 95
 static unsigned long go_hispeed_load = DEFAULT_GO_HISPEED_LOAD;
 
 /* Target load.  Lower values result in higher CPU speeds. */
@@ -86,7 +86,7 @@ static unsigned long min_sample_time = DEFAULT_MIN_SAMPLE_TIME;
 /*
  * The sample rate of the timer used to increase frequency
  */
-#define DEFAULT_TIMER_RATE (20 * USEC_PER_MSEC)
+#define DEFAULT_TIMER_RATE (25 * USEC_PER_MSEC)
 static unsigned long timer_rate = DEFAULT_TIMER_RATE;
 
 /*
@@ -100,10 +100,10 @@ static spinlock_t above_hispeed_delay_lock;
 static unsigned int *above_hispeed_delay = default_above_hispeed_delay;
 static int nabove_hispeed_delay = ARRAY_SIZE(default_above_hispeed_delay);
 
-/* Non-zero means indefinite speed boost active */
-static int boost_val;
+/* 1000ms - 1s */
+#define DEFAULT_BOOSTPULSE_DURATION 1000000
 /* Duration of a boot pulse in usecs */
-static int boostpulse_duration_val = DEFAULT_MIN_SAMPLE_TIME;
+static int boostpulse_duration_val = DEFAULT_BOOSTPULSE_DURATION;
 /* End time of boost pulse in ktime converted to usecs */
 static u64 boostpulse_endtime;
 
@@ -120,8 +120,8 @@ static bool io_is_busy = true;
  * The CPU will be boosted to this frequency when the screen is
  * touched. input_boost needs to be enabled.
  */
-#define DEFAULT_INPUT_BOOST_FREQ 1242000
-static int input_boost_freq;
+#define DEFAULT_INPUT_BOOST_FREQ 1134000
+static int input_boost_freq = DEFAULT_INPUT_BOOST_FREQ;
 
 bool interactive_selected = true;
 
@@ -403,17 +403,15 @@ static void cpufreq_interactive_timer(unsigned long data)
 	do_div(cputime_speedadj, delta_time);
 	loadadjfreq = (unsigned int)cputime_speedadj * 100;
 	cpu_load = loadadjfreq / pcpu->target_freq;
-	boosted = boost_val || now < boostpulse_endtime;
+	boosted = now < boostpulse_endtime;
 
-	if (cpu_load >= go_hispeed_load || boosted) {
-		if (pcpu->target_freq < hispeed_freq) {
+	if (cpu_load >= go_hispeed_load) {
+		new_freq = choose_freq(pcpu, loadadjfreq);
+
+		if (new_freq < hispeed_freq)
 			new_freq = hispeed_freq;
-		} else {
-			new_freq = choose_freq(pcpu, loadadjfreq);
-
-			if (new_freq < hispeed_freq)
-				new_freq = hispeed_freq;
-		}
+	} else if (boosted) {
+		new_freq = input_boost_freq;	
 	} else {
 		new_freq = choose_freq(pcpu, loadadjfreq);
 	}
@@ -961,36 +959,6 @@ static ssize_t store_timer_slack(
 
 define_one_global_rw(timer_slack);
 
-static ssize_t show_boost(struct kobject *kobj, struct attribute *attr,
-			  char *buf)
-{
-	return sprintf(buf, "%d\n", boost_val);
-}
-
-static ssize_t store_boost(struct kobject *kobj, struct attribute *attr,
-			   const char *buf, size_t count)
-{
-	int ret;
-	unsigned long val;
-
-	ret = kstrtoul(buf, 0, &val);
-	if (ret < 0)
-		return ret;
-
-	boost_val = val;
-
-	if (boost_val) {
-		trace_cpufreq_interactive_boost("on");
-		cpufreq_interactive_boost();
-	} else {
-		trace_cpufreq_interactive_unboost("off");
-	}
-
-	return count;
-}
-
-define_one_global_rw(boost);
-
 static ssize_t store_boostpulse(struct kobject *kobj, struct attribute *attr,
 				const char *buf, size_t count)
 {
@@ -1064,7 +1032,6 @@ static struct attribute *interactive_attributes[] = {
 	&timer_rate_attr.attr,
 	&input_boost_freq_attr.attr,
 	&timer_slack.attr,
-	&boost.attr,
 	&boostpulse.attr,
 	&boostpulse_duration.attr,
 	&io_is_busy_attr.attr,
