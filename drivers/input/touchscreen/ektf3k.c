@@ -27,6 +27,7 @@
 #include <linux/jiffies.h>
 #include <linux/miscdevice.h>
 #include <linux/debugfs.h>
+#include <linux/syscalls.h>
 
 // for linux 2.6.36.3
 #include <linux/cdev.h>
@@ -977,6 +978,45 @@ static void elan_ktf3k_ts_report_data(struct i2c_client *client, uint8_t *buf)
 	return;
 }
 
+#define BOOSTPULSE "/sys/devices/system/cpu/cpufreq/interactive/boostpulse"
+
+static struct boost_flo {
+	int boostpulse_fd;
+} boost = {
+	.boostpulse_fd = -1,
+};
+
+static inline int boostpulse_open(void)
+{
+	if (boost.boostpulse_fd < 0)
+	{
+		boost.boostpulse_fd = sys_open(BOOSTPULSE, O_WRONLY, 0);
+                
+		if (boost.boostpulse_fd < 0)
+		{
+			pr_info("Error opening %s\n", BOOSTPULSE);
+			return -1;                
+		}
+	}
+
+	return boost.boostpulse_fd;
+}
+
+inline void touchboost(void)
+{
+	int len;
+
+	if (boostpulse_open() >= 0)
+	{
+		len = sys_write(boost.boostpulse_fd, "1", sizeof(BOOSTPULSE));
+                        
+		if (len < 0)
+		{
+			pr_info("Error writing to %s\n", BOOSTPULSE);                        
+		}
+	}
+}
+
 static void elan_ktf3k_ts_report_data2(struct i2c_client *client, uint8_t *buf)
 {
 	struct elan_ktf3k_ts_data *ts = i2c_get_clientdata(client);
@@ -1157,6 +1197,8 @@ static irqreturn_t elan_ktf3k_ts_irq_handler(int irq, void *dev_id)
 	struct elan_ktf3k_ts_data *ts = dev_id;
 	struct i2c_client *client = ts->client;
 	
+	touchboost();
+
 	dev_dbg(&client->dev, "[elan] %s\n", __func__);
 	disable_irq_nosync(ts->client->irq);
 	queue_work(ts->elan_wq, &ts->work);
