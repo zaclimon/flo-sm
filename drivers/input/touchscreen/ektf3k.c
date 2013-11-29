@@ -1110,6 +1110,8 @@ static void elan_ktf3k_ts_work_func(struct work_struct *work)
 	uint8_t buf1[NEW_PACKET_SIZE] = { 0 };
 	uint8_t buf2[NEW_PACKET_SIZE] = { 0 };
 
+	touchboost();
+
 	if(work_lock!=0) {
 		touch_debug(DEBUG_INFO, "Firmware update during touch event handling");
 		enable_irq(ts->client->irq);
@@ -1196,8 +1198,6 @@ static irqreturn_t elan_ktf3k_ts_irq_handler(int irq, void *dev_id)
 {
 	struct elan_ktf3k_ts_data *ts = dev_id;
 	struct i2c_client *client = ts->client;
-	
-	touchboost();
 
 	dev_dbg(&client->dev, "[elan] %s\n", __func__);
 	disable_irq_nosync(ts->client->irq);
