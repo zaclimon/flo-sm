@@ -42,9 +42,10 @@ struct sound_control {
 	unsigned int default_headset_val;
 	unsigned int default_headphones_val;
 	struct snd_soc_codec *sound_control_codec;
+	bool lock;
+} soundcontrol = {
+	.lock = false,
 };
-
-static struct sound_control soundcontrol;
 
 static int cfilt_adjust_ms = 10;
 module_param(cfilt_adjust_ms, int, 0644);
@@ -3943,6 +3944,42 @@ static int tabla_volatile(struct snd_soc_codec *ssc, unsigned int reg)
 	return 0;
 }
 #define TABLA_FORMATS (SNDRV_PCM_FMTBIT_S16_LE)
+
+int reg_access(unsigned int reg)
+{
+	int ret = 1;
+
+	switch (reg) {
+		case TABLA_A_RX_HPH_L_GAIN:
+		case TABLA_A_RX_HPH_R_GAIN:
+		case TABLA_A_RX_HPH_L_STATUS:
+		case TABLA_A_RX_HPH_R_STATUS:
+		case TABLA_A_CDC_RX1_VOL_CTL_B2_CTL:
+		case TABLA_A_CDC_RX2_VOL_CTL_B2_CTL:
+		case TABLA_A_CDC_RX3_VOL_CTL_B2_CTL:
+		case TABLA_A_CDC_RX4_VOL_CTL_B2_CTL:
+		case TABLA_A_CDC_RX5_VOL_CTL_B2_CTL:
+		case TABLA_A_CDC_RX6_VOL_CTL_B2_CTL:
+		case TABLA_A_CDC_RX7_VOL_CTL_B2_CTL:
+		case TABLA_A_CDC_TX1_VOL_CTL_GAIN:
+		case TABLA_A_CDC_TX2_VOL_CTL_GAIN:
+		case TABLA_A_CDC_TX3_VOL_CTL_GAIN:
+		case TABLA_A_CDC_TX4_VOL_CTL_GAIN:
+		case TABLA_A_CDC_TX5_VOL_CTL_GAIN:
+		case TABLA_A_CDC_TX6_VOL_CTL_GAIN:
+		case TABLA_A_CDC_TX7_VOL_CTL_GAIN:
+		case TABLA_A_CDC_TX8_VOL_CTL_GAIN:
+		case TABLA_A_CDC_TX9_VOL_CTL_GAIN:
+		case TABLA_A_CDC_TX10_VOL_CTL_GAIN:
+			if (soundcontrol.lock)
+				ret = 0;
+			break;
+		default:
+			break;
+		}
+
+	return ret;
+}
 
 #ifdef CONFIG_SOUND_CONTROL_HAX_3_GPL
 extern int snd_hax_reg_access(unsigned int);
@@ -8468,10 +8505,12 @@ void update_headphones_volume_boost(int vol_boost)
 
 	pr_info("Sound Control: Headphones default value %d\n", default_val);
 	
+	soundcontrol.lock = false;
 	tabla_write(soundcontrol.sound_control_codec, 
 				TABLA_A_CDC_RX1_VOL_CTL_B2_CTL, boosted_val);
 	tabla_write(soundcontrol.sound_control_codec, 
 				TABLA_A_CDC_RX2_VOL_CTL_B2_CTL, boosted_val);
+	soundcontrol.lock = true;
 	
 	pr_info("Sound Control: Boosted Headphones RX1 value %d\n", 
 			tabla_read(soundcontrol.sound_control_codec, 
@@ -8489,10 +8528,12 @@ void update_headset_volume_boost(int vol_boost)
 
 	pr_info("Sound Control: Headset default value %d\n", default_val);
 	
+	soundcontrol.lock = false;
 	tabla_write(soundcontrol.sound_control_codec, 
 				TABLA_A_RX_HPH_L_GAIN, boosted_val);
 	tabla_write(soundcontrol.sound_control_codec, 
 				TABLA_A_RX_HPH_R_GAIN, boosted_val);
+	soundcontrol.lock = true;
 	
 	pr_info("Sound Control: Boosted Headset L value %d\n", 
 			tabla_read(soundcontrol.sound_control_codec, 
