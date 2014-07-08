@@ -1,39 +1,34 @@
-#!/bin/bash
+export CROSS_COMPILE="$HOME/sm-arm-eabi-4.9/bin/arm-eabi-"
+KERNEL_DIRECTORY="$HOME/flo-sm"
+ANYKERNEL_DIRECTORY="$HOME/anykernel_msm"
 
-RAMDISK="boot.img-ramdisk"
-
-if [ $# -gt 0 ]; then
-echo $1 > .version
-echo $1
-fi
- 
-if [ $# -gt 1 ]; then
-RAMDISK="boot.img-ramdisk-deb"
-echo $2
-echo $RAMDISK
+if [[ "$1" =~ "cm" || "$1" =~ "CM" ]] ; then
+git checkout sm-4.4-cm
+zipfile="franco.Kernel-SaberMod-r17-CM.zip"
+else
+git checkout sm-4.4
+zipfile="franco.Kernel-SaberMod-r17.zip"
 fi
 
-time make -j16
- 
-cp arch/arm/boot/zImage ../ramdisk_flo/
- 
-cd ../ramdisk_flo/
- 
-echo "making ramdisk"
-./mkbootfs $RAMDISK | gzip > ramdisk.gz
-echo "making boot image"
-./mkbootimg --kernel zImage --cmdline 'console=ttyHSL0,115200,n8 androidboot.hardware=flo user_debug=31 msm_rtb.filter=0x3F ehci-hcd.park=3' --base 0x80200000 --pagesize 2048 --ramdisk_offset 0x02000000 --ramdisk ramdisk.gz --output ../flo/boot.img
- 
-rm -rf ramdisk.gz
-rm -rf zImage
 
-cd ../flo/
+cd $ANYKERNEL_DIRECTORY
+git checkout flo
 
-zipfile="franco.Kernel-nightly.zip"
+cd $KERNEL_DIRECTORY
+
+if [ -f zip/$zipfile ] ; then
+rm -rf zip/*
+fi
+
+make franco_defconfig
+make -j16
+
+cd $ANYKERNEL_DIRECTORY
+cp -r * $KERNEL_DIRECTORY/zip/
+cd $KERNEL_DIRECTORY
+cp arch/arm/boot/zImage zip/tmp/anykernel
+
 echo "making zip file"
-cp boot.img zip/
-
-rm -rf ../ramdisk_flo/boot.img
  
 cd zip/
 rm -f *.zip
