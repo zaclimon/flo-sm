@@ -886,7 +886,6 @@ struct hid_report *hid_validate_values(struct hid_device *hid,
 }
 EXPORT_SYMBOL_GPL(hid_validate_values);
 
->>>>>>> 7e33d02... Linux 3.4.96
 /**
  * hid_match_report - check if driver's raw_event should be called
  *
