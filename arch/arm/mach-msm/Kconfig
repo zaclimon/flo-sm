@@ -2632,7 +2632,7 @@ config LCD_KCAL_STANDALONE
 
 config USBHOST  # tmtmtm
 	bool "USBHOST related runtime configuration"
-	default y
+	default n
  	help
  	  A simple sysfs interface to allow switching between OTG and FI mode.
 
